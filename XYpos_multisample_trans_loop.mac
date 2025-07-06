@@ -1,0 +1,114 @@
+#### This macro runs a snake style scan on the transmission plate 
+#########################################################################################################################################################
+#### To run this macro:       (1) Make sure the blocks for global, scan, and grid parameters are what you want 
+####		                  (2) Name things in the naming block --> Cannot start with number
+####		                  (3) Every edit you make should be only till the end of the NAMING BLOCK. No edits after. 
+####		                  (4) run your macro. Type: "qdo ~/data/ABC_MONTHYYYY/macro_name.mac" --> Check Line 10 for ABC_MONTHYYYY
+
+#### GLOBAL PARAMETERS
+user_account = "b_tsao"             # xyz is the account name
+user_folder = "May2025"             # This is the main folder under bl11-3, where data will be saved
+
+#### SCAN PARAMETERS
+rock_motor = "trx"                  # trx --> horizontal, try --> vertical
+rock_step = 0.1                     # in mm
+exp_time = 1                        # in seconds
+
+#### SAMPLE PARAMETERS (DEFINES PARAMETERS AT THE CELL LEVEL)
+num_samples = 4
+
+## SAMPLE 1
+samples_name[0] = "NaS_ECPC_4M_1_CONTD_3"         # --> MAKE SURE THE NAME DOESN'T START WITH A NUMBER
+sample_posx[0] = 112              # in mm
+sample_posy[0] = 15                  # in mm
+x_step[0] = 1                       # in mm
+y_step[0] = 1                       # in mm
+num_x_steps[0] = 2
+num_y_steps[0] = 2
+
+## SAMPLE 2
+samples_name[1] = "NaS_ECPC_4M_2_CONTD_3"           # --> MAKE SURE THE NAME DOESN'T START WITH A NUMBER
+sample_posx[1] = 168               # in mm
+sample_posy[1] = 16               # in mm
+x_step[1] = 1                        # in mm
+y_step[1] = 0.5                        # in mm
+num_x_steps[1] = 2
+num_y_steps[1] = 2
+
+## SAMPLE 3
+samples_name[2] = "NaS_DME_2_CONTD_3"   # --> MAKE SURE THE NAME DOESN'T START WITH A NUMBER
+sample_posx[2] = 111               # in mm
+sample_posy[2] = 78                 # in mm
+x_step[2] = 1                      # in mm
+y_step[2] = 0.5                        # in mm
+num_x_steps[2] = 2
+num_y_steps[2] = 2
+
+## SAMPLE 4
+samples_name[3] = "NaS_DME_1_CONTD_3"          # --> MAKE SURE THE NAME DOESN'T START WITH A NUMBER
+sample_posx[3] = 168               # in mm
+sample_posy[3] = 78                  # in mm
+x_step[3] = 1                      # in mm
+y_step[3] = 0.5                        # in mm
+num_x_steps[3] = 2
+num_y_steps[3] = 2
+
+##############################################################################################################################################################
+
+numscans = 100000000                 # number of scans to loop through --> Set it really high
+
+#### Create the directory (plate name) if it doesn't exist
+for (ii = 0; ii < num_samples; ii++){
+	if (file_info(sprintf("/msd_data/%s/bl11-3/%s/%s", user_account, user_folder, samples_name[ii]))){
+    
+		p "This foldername already exists. If sample names are the same, previous data will be overwritten." 
+		user_input = input("Are you sure you want to proceed (Type Y or N): ")
+		if (user_input == "n" || user_input == "N" || user_input == "NO" || user_input == "no" || user_input == "No"){
+			p "Please change the sample name and rerun the macro." 
+			exit
+		} 
+	}
+	eval(sprintf("u mkdir -p /msd_data/%s/bl11-3/%s/%s", user_account, user_folder, samples_name[ii]))
+}
+
+
+#### Run the actual scan
+while (scan < numscans){
+	
+    # Collects a new background scan every 10 scans
+    if (scan%100 == 0) {
+        p "Collecting a background frame" 
+        mar bckgrd
+    }
+	
+    for (samples = 0; samples < num_samples; samples++){
+        
+        umv trx sample_posx[samples] try sample_posy[samples]
+        pos = 1
+        
+        for (x_steps = 0; x_steps < num_x_steps[samples]; x_steps++){
+				
+            if (x_steps > 0) {
+                umvr trx x_step[samples]
+            }
+            
+            for (y_steps = 0; y_steps < num_y_steps[samples]; y_steps++){
+				
+                if (y_steps > 0) {
+                    umvr try y_step[samples] 
+                }
+				
+                MAR_FILEROOT = sprintf("/msd_data/%s/bl11-3/%s/%s/%s_position_%.2d", user_account, user_folder, samples_name[samples], samples_name[samples], pos)				
+                eval(sprintf("mar rexpose %s %.2f %d", rock_motor, rock_step, exp_time)) 
+                MAR_JOB_INDEX = scan
+                mar save
+                pos = pos + 1
+            }
+								
+        }
+	
+    }
+    p "Sleeping now ZzzZ, press CTRL+C to stop the scan"
+    sleep(30)
+    scan = scan+1
+}
